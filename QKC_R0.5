@@ -1,0 +1,291 @@
+# Deriving the QKC Model, feat. Martin Culpepper's PHD disssertation
+
+import numpy as np
+
+# Phase 1: User Inputs
+theta_c = 0.5585053606 #rad
+O_SRr = -0.0752 #in
+R_s = 0.3946 #in
+#FrictionCoef
+mew_TI = 0 #NA
+mew_Ts = 0 #NA
+#ImposedDisplacements
+delta_r = 0.000001 #in
+phi = 45 #deg
+capDelta_zcc = -0.003 #in
+epsilon_x = 10**-99*np.pi/(180*10**6)
+epsilon_y = 10**-99*np.pi/(180*10**6)
+epsilon_z = 10**-99*np.pi/(180*10**6)
+#JointPositionsRelativeToArbCoordinateSystem
+p_1 = [1.7618, 6.772, 1]
+p_2 = [-3.94,3.2677,1]
+p_3 = [-10.8366,6.772,1]
+#ContactFlatIntegrationAngles
+theta_ri11 = 0.523598 #rad
+theta_rf11 = 2.61799 #rad
+theta_ri12 = 3.665191429 #rad
+theta_rf12 = 5.759586532 #rad
+theta_ri21 = 0.523598 #rad
+theta_rf21 = 2.61799 #rad
+theta_ri22 = 3.665191429 #rad
+theta_rf22 = 5.759586532 #rad
+theta_ri31 = 0.523598 #rad
+theta_rf31 = 2.61799 #rad
+theta_ri32 = 3.665191429 #rad
+theta_rf32 = 5.759586532 #rad
+#FEA Force vs. Displacement Curve Fit Variables
+b_1 = 0.43 #lbf/in^1.43
+K_1 = 28456#lbf/in^1.43
+b_2 = 0.43#lbf/in^1.43
+K_2 = 28456#lbf/in^1.43
+b_3 = 0.43#lbf/in^1.43
+K_3 = 28456#lbf/in^1.43
+
+import numpy as np
+import sympy as sp
+from sympy import symbols
+
+# STEP 2: Solution for Joint Position Vectors Relative to Coupling Center (computations)
+# Assuming p_1, p_2, p_3 are defined elsewhere in your code
+# For symbolic computations, we need to declare them as symbolic variables
+p_1 = sp.Matrix(symbols('p1x p1y p1z'))
+p_2 = sp.Matrix(symbols('p2x p2y p2z'))
+p_3 = sp.Matrix(symbols('p3x p3y p3z'))
+
+# Compute theta values symbolically
+theta_1 = sp.atan2(p_2[1] - p_1[1], p_2[0] - p_1[0])
+theta_2 = sp.atan2(p_3[1] - p_1[1], p_3[0] - p_1[0])
+theta_3 = sp.atan2(p_2[1] - p_3[1], p_2[0] - p_3[0])
+theta_4 = 0.5 * (theta_3 + theta_2 - sp.pi)
+theta_5 = 0.5 * (theta_1 + theta_2)
+theta_6 = 0.5 * (theta_1 + theta_3)
+x_cc = (p_3[1] - p_1[1] + sp.tan(theta_5) * p_1[0] - sp.tan(theta_4) * p_3[0]) / (sp.tan(theta_5) - sp.tan(theta_4))
+y_cc = sp.tan(theta_5) * (x_cc - p_1[0]) + p_1[1]
+z_cc = p_3[2]
+
+# Coupling center positions relative to arbitrary coordinate system
+p_cc = sp.Matrix([x_cc, y_cc, z_cc])
+
+# Joint Coordinate System Position Vectors Relative to Coupling Center
+r_cs1 = p_1 - p_cc
+r_cs2 = p_2 - p_cc
+r_cs3 = p_3 - p_cc
+
+# Magnitudes (norms) of the vectors
+magr_cs1 = r_cs1.norm()
+magr_cs2 = r_cs2.norm()
+magr_cs3 = r_cs3.norm()
+
+# STEP 3: Calculation of Imposed Displacement Variables and Directions
+delta_r, phi, epsilon_x, epsilon_y, epsilonz = symbols('delta_r phi epsilon_x epsilon_y epsilonz')
+theta_r, theta_c, capDelta_zcc, epsilonxy, R_s, O_SRr, gamma = symbols('theta_r theta_c capDelta_zcc epsilonxy R_s O_SRr gamma')
+
+# Convert phi to radians
+phi_rad = phi * sp.pi / 180
+
+# Symbolic computations of capDelta_xcc, capDelta_ycc, capDelta_zcc
+capDelta_xcc = delta_r * sp.cos(phi_rad)
+capDelta_ycc = delta_r * sp.sin(phi_rad)
+capDelta_zcc = sp.sqrt(capDelta_xcc**2 + capDelta_ycc**2)
+
+# Compute gamma and epsilonxy symbolically
+gamma = sp.atan2(epsilon_x, epsilon_y)
+epsilonxy = sp.sqrt(epsilon_x**2 + epsilon_y**2)
+
+# K vector and epsilon_z vector
+k_sym = sp.Matrix([0, 0, 1])
+epsilon_z_sym = sp.Matrix([0, 0, epsilonz])
+r_epsilonz = sp.Matrix([0, 0, 0])
+
+# Epsilon_xy vector
+epsilon_xy_sym = sp.Matrix([epsilonxy * sp.cos(gamma), epsilonxy * sp.sin(gamma), 0])
+r_epsilonxy = sp.Matrix([0, 0, 0])
+
+# STEP 4: Direction Angles for Displacements
+# Cross products with sympy
+delta_rmax1epsilonz_sym = r_cs1.cross(epsilon_z_sym)
+delta_rmax2epsilonz_sym = r_cs2.cross(epsilon_z_sym)
+delta_rmax3epsilonz_sym = r_cs3.cross(epsilon_z_sym)
+
+# Symbolic atan2 for theta_deltamax
+theta_deltamax1epsilonz_sym = sp.atan2(delta_rmax1epsilonz_sym[1], delta_rmax1epsilonz_sym[0])
+theta_deltamax2epsilonz_sym = sp.atan2(delta_rmax2epsilonz_sym[1], delta_rmax2epsilonz_sym[0])
+theta_deltamax3epsilonz_sym = sp.atan2(delta_rmax3epsilonz_sym[1], delta_rmax3epsilonz_sym[0])
+
+# Define capDelta_n1_thetaR using symbolic math
+capDelta_n1_thetaR = (
+    delta_rmax1epsilonz_sym.norm() * sp.cos(theta_r - theta_deltamax1epsilonz_sym) * sp.cos(theta_c)
+    + (capDelta_zcc
+       - epsilonxy * (R_s * sp.cos(theta_c) + O_SRr) * sp.sin(theta_r - gamma)
+       + k_sym.dot(epsilon_xy_sym.cross(r_cs1 - r_epsilonxy)) * sp.sin(theta_c))
+)
+
+# Similarly define capDelta_n2_thetaR and capDelta_n3_thetaR
+capDelta_n2_thetaR = (
+    delta_rmax2epsilonz_sym.norm() * sp.cos(theta_r - theta_deltamax2epsilonz_sym) * sp.cos(theta_c)
+    + (capDelta_zcc
+       - epsilonxy * (R_s * sp.cos(theta_c) + O_SRr) * sp.sin(theta_r - gamma)
+       + k_sym.dot(epsilon_xy_sym.cross(r_cs2 - r_epsilonxy)) * sp.sin(theta_c))
+)
+
+capDelta_n3_thetaR = (
+    delta_rmax3epsilonz_sym.norm() * sp.cos(theta_r - theta_deltamax3epsilonz_sym) * sp.cos(theta_c)
+    + (capDelta_zcc
+       - epsilonxy * (R_s * sp.cos(theta_c) + O_SRr) * sp.sin(theta_r - gamma)
+       + k_sym.dot(epsilon_xy_sym.cross(r_cs3 - r_epsilonxy)) * sp.sin(theta_c))
+)
+
+# Display the symbolic expressions (optional)
+sp.pprint(capDelta_n1_thetaR)
+sp.pprint(capDelta_n2_thetaR)
+sp.pprint(capDelta_n3_thetaR)
+
+import sympy as sp
+
+# Assuming Rs, O_SRr, theta_c, theta_r, f_n2, mu_T1, mu_Ts, theta_ri21, theta_rf21, are already defined
+f_n1 = K_1*(capDelta_n1_thetaR)**b_1
+f_n2 = K_2*(capDelta_n2_thetaR)**b_2
+f_n3 = K_3*(capDelta_n3_thetaR)**b_3
+
+
+# Symbolic variables (in case they were not defined previously)
+theta_r = sp.symbols('theta_r')
+theta_ri21, theta_rf21 = sp.symbols('theta_ri21 theta_rf21')
+
+# f_n2(theta_r) is assumed to be already defined, if not it should be declared as a function:
+# f_n2 = sp.Function('f_n2')(theta_r)
+
+# Define the three integrals
+
+integral_1 = sp.integrate(
+    -f_n1 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri11, theta_rf11)
+)
+
+integral_2 = sp.integrate(
+    -f_n1 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri11, theta_rf11)
+)
+
+integral_3 = sp.integrate(
+    -f_n1 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri11, theta_rf11)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC11 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+
+# Display the result
+F_ARC11
+
+integral_1 = sp.integrate(
+    -f_n1 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri12, theta_rf12)
+)
+
+integral_2 = sp.integrate(
+    -f_n1 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri12, theta_rf12)
+)
+
+integral_3 = sp.integrate(
+    -f_n1 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri12, theta_rf12)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC12 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+# Display the result
+F_ARC12
+
+#PEG1 forces result
+F_PEG1 = F_ARC11 + F_ARC12
+#Dipslay result
+F_PEG1
+
+integral_1 = sp.integrate(
+    -f_n2 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri21, theta_rf21)
+)
+
+integral_2 = sp.integrate(
+    -f_n2 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri21, theta_rf21)
+)
+
+integral_3 = sp.integrate(
+    -f_n2 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri21, theta_rf21)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC21 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+# Display the result
+F_ARC21
+
+integral_1 = sp.integrate(
+    -f_n2 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri22, theta_rf22)
+)
+
+integral_2 = sp.integrate(
+    -f_n2 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri22, theta_rf22)
+)
+
+integral_3 = sp.integrate(
+    -f_n2 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri22, theta_rf22)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC22 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+# Display the result
+F_ARC22
+
+#F_PEG2 Resultant
+F_PEG2 = F_ARC21 + F_ARC22
+
+integral_1 = sp.integrate(
+    -f_n3 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri31, theta_rf31)
+)
+
+integral_2 = sp.integrate(
+    -f_n3 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri31, theta_rf31)
+)
+
+integral_3 = sp.integrate(
+    -f_n3 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri31, theta_rf31)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC31 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+# Display the result
+F_ARC31
+
+integral_1 = sp.integrate(
+    -f_n3 * (-sp.cos(theta_r) * sp.cos(theta_c) - mew_Ts * sp.sin(theta_r) + mew_TI * sp.cos(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri32, theta_rf32)
+)
+
+integral_2 = sp.integrate(
+    -f_n3 * (-sp.sin(theta_r) * sp.cos(theta_c) + mew_Ts * sp.cos(theta_r) + mew_TI * sp.sin(theta_r) * sp.sin(theta_c)),
+    (theta_r, theta_ri32, theta_rf32)
+)
+
+integral_3 = sp.integrate(
+    -f_n3 * (sp.sin(theta_c) + mew_TI * sp.cos(theta_c)),
+    (theta_r, theta_ri32, theta_rf32)
+)
+
+# Combine the integrals into the symbolic vector F_ARC1
+F_ARC32 = (R_s * sp.cos(theta_c) + O_SRr) * sp.Matrix([integral_1, integral_2, integral_3])
+# Display the result
+F_ARC32
+
+#F_PEG2 Resultant
+F_PEG3 = F_ARC31 + F_ARC32
+
